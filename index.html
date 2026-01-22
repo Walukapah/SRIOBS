@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Web OBS</title>
+
+<style>
+body {
+    background:#0e0e0e;
+    color:white;
+    font-family:Arial;
+    text-align:center;
+}
+input,button {
+    padding:10px;
+    margin:5px;
+}
+#canvas {
+    width:1280px;
+    height:720px;
+    margin:20px auto;
+    border:2px solid #555;
+    background:black;
+    position:relative;
+}
+.item {
+    position:absolute;
+    border:1px dashed #aaa;
+    padding:5px;
+    cursor:move;
+}
+img,video {
+    max-width:300px;
+}
+</style>
+
+</head>
+<body>
+
+<h2>🎥 Web OBS (No Templates)</h2>
+
+<input id="key" placeholder="YouTube Stream Key">
+<button onclick="startLive()">START LIVE</button>
+<button onclick="stopLive()">STOP</button>
+
+<hr>
+
+<input type="file" onchange="upload(this,'images')">
+<input type="file" onchange="upload(this,'videos')">
+<input type="file" onchange="upload(this,'audio')">
+<button onclick="addText()">Add Text</button>
+
+<div id="canvas"></div>
+
+<script>
+let scene = []
+const canvas = document.getElementById("canvas")
+
+function upload(el,type){
+    let fd = new FormData()
+    fd.append("file", el.files[0])
+    fd.append("type", type)
+
+    fetch("/upload",{method:"POST",body:fd})
+    .then(r=>r.json())
+    .then(d=>{
+        scene.push({type:type,path:d.path,x:50,y:50})
+        draw(); save()
+    })
+}
+
+function addText(){
+    let t = prompt("Enter Text")
+    if(!t) return
+    scene.push({type:"text",text:t,x:100,y:100})
+    draw(); save()
+}
+
+function draw(){
+    canvas.innerHTML=""
+    scene.forEach((o,i)=>{
+        let e=document.createElement("div")
+        e.className="item"
+        e.style.left=o.x+"px"
+        e.style.top=o.y+"px"
+        e.draggable=true
+
+        e.ondragend=(ev)=>{
+            o.x=ev.pageX-canvas.offsetLeft
+            o.y=ev.pageY-canvas.offsetTop
+            save()
+        }
+
+        if(o.type=="text") e.innerText=o.text
+        if(o.type=="images") e.innerHTML=`<img src="/${o.path}">`
+        if(o.type=="videos") e.innerHTML=`<video src="/${o.path}" autoplay loop muted></video>`
+
+        e.onclick=()=>{
+            if(confirm("Delete this item?")){
+                scene.splice(i,1)
+                draw(); save()
+            }
+        }
+        canvas.appendChild(e)
+    })
+}
+
+function save(){
+    fetch("/scene",{method:"POST",headers:{'Content-Type':'application/json'},body:JSON.stringify(scene)})
+}
+
+function startLive(){
+    fetch("/start",{method:"POST",headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({key:key.value})})
+}
+
+function stopLive(){ fetch("/stop") }
+</script>
+
+</body>
+</html>
